@@ -1,0 +1,34 @@
+# Build & Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# Logs
+*.log
+
+# NuGet
+*.nupkg
+packages/
+
+# ASP.NET
+*.vspscc
+.vscode/
+
+# User secrets
+secrets.json
+secrets.*
+appsettings.*.json
+
+# Publish output
+publish/
+
+# OS files
+Thumbs.db
+.DS_Store
