@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +28,7 @@ public class FaqController : ControllerBase
         [FromQuery] string? category,
         [FromQuery] string? tag)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -71,7 +71,7 @@ public class FaqController : ControllerBase
     [Authorize(Roles = "User,Analyst,Admin")]
     public async Task<ActionResult<FaqDetail>> GetById(Guid id)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -107,7 +107,7 @@ public class FaqController : ControllerBase
         if (string.IsNullOrWhiteSpace(req.Title) || string.IsNullOrWhiteSpace(req.Category) || string.IsNullOrWhiteSpace(req.Content))
             return BadRequest("Title, Category e Content são obrigatórios.");
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -146,7 +146,7 @@ public class FaqController : ControllerBase
         if (string.IsNullOrWhiteSpace(req.Title) || string.IsNullOrWhiteSpace(req.Category) || string.IsNullOrWhiteSpace(req.Content))
             return BadRequest("Title, Category e Content são obrigatórios.");
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -186,7 +186,7 @@ public class FaqController : ControllerBase
     [Authorize(Roles = "Analyst,Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -206,7 +206,7 @@ public class FaqController : ControllerBase
     [Authorize(Roles = "User,Analyst,Admin")]
     public async Task<IActionResult> Feedback(Guid id, [FromBody] FaqFeedbackRequest req)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -244,7 +244,7 @@ public class FaqController : ControllerBase
     [Authorize(Roles = "User,Analyst,Admin")]
     public async Task<ActionResult<IEnumerable<object>>> Popular()
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 

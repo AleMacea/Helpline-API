@@ -36,7 +36,7 @@ public class TicketsController : ControllerBase
         if (string.IsNullOrWhiteSpace(req.Title))
             return BadRequest("Title é obrigatório.");
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -75,7 +75,7 @@ public class TicketsController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<object>> GetById(Guid id)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -124,7 +124,7 @@ WHERE t.Id = @Id";
     [HttpPatch("{id:guid}")]
     public async Task<ActionResult<object>> Update(Guid id, [FromBody] TicketUpdateRequest req)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -190,7 +190,7 @@ WHERE t.Id = @Id;";
         if (pageSize > 100) pageSize = 100;
 
         var skip = (page - 1) * pageSize;
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -281,7 +281,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
         if (!Guid.TryParse(userIdStr, out var userId))
             return Unauthorized();
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -358,7 +358,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
         if (string.IsNullOrWhiteSpace(req.SenderType) || string.IsNullOrWhiteSpace(req.Content))
             return BadRequest("SenderType e Content são obrigatórios.");
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -387,7 +387,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
     [HttpGet("{id:guid}/messages")]
     public async Task<ActionResult<object>> GetMessages(Guid id)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
 namespace Helpline.Api.Controllers;
@@ -12,7 +12,7 @@ public class HealthController : ControllerBase
 [HttpGet]
     public async Task<IActionResult> Get()
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         try
         {
             await using var conn = new SqlConnection(cs);

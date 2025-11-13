@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -46,12 +46,12 @@ public class AuthController : ControllerBase
 
         var origin = string.IsNullOrWhiteSpace(req.Origin) ? "web" : req.Origin;
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
         // Verifica se e-mail já existe
-        var checkCmd = new SqlCommand("SELECT COUNT(1) FROM dbo.[User] WHERE Email=@Email", conn);
+        var checkCmd = new SqlCommand("SELECT COUNT(1) FROM dbo.Users WHERE Email=@Email", conn);
         checkCmd.Parameters.Add(new SqlParameter("@Email", SqlDbType.NVarChar, 255) { Value = req.Email });
         var exists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
         if (exists)
@@ -69,7 +69,7 @@ public class AuthController : ControllerBase
         // Insere usuário com Origin
         var userId = Guid.NewGuid();
         var insertUser = new SqlCommand(@"
-            INSERT INTO dbo.[User](Id, Name, Email, PasswordHash, PasswordSalt, Origin)
+            INSERT INTO dbo.Users(Id, Name, Email, PasswordHash, PasswordSalt, Origin)
             VALUES(@Id, @Name, @Email, @Hash, @Salt, @Origin);", conn);
         insertUser.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
         insertUser.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 120) { Value = req.Name });
@@ -115,14 +115,14 @@ public class AuthController : ControllerBase
             return BadRequest("E-mail e senha são obrigatórios.");
         }
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
         // Busca user
         var getUser = new SqlCommand(@"
             SELECT TOP 1 Id, Name, Email, PasswordHash, PasswordSalt
-            FROM dbo.[User] WHERE Email=@Email", conn);
+            FROM dbo.Users WHERE Email=@Email", conn);
         getUser.Parameters.Add(new SqlParameter("@Email", SqlDbType.NVarChar, 255) { Value = req.Email });
 
         Guid userId;

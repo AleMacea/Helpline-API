@@ -32,7 +32,7 @@ public class UsersController : ControllerBase
 
         var skip = (page - 1) * pageSize;
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
@@ -41,7 +41,7 @@ public class UsersController : ControllerBase
 
             SELECT u.Id, u.Name, u.Email, u.Origin
             INTO #users
-            FROM dbo.[User] u
+            FROM dbo.Users u
             WHERE (@q IS NULL OR (u.Name LIKE '%' + @q + '%' OR u.Email LIKE '%' + @q + '%'))
               AND (@origin IS NULL OR u.Origin = @origin);
 
@@ -84,16 +84,14 @@ public class UsersController : ControllerBase
             {
                 while (await rdr.ReadAsync())
                 {
-                    var id = rdr.GetGuid(0);
-                    var name = rdr.GetString(1);
-                    var email = rdr.GetString(2);
-                    var originVal = rdr.GetString(3);
                     var rolesCsv = rdr.IsDBNull(4) ? "" : rdr.GetString(4);
-                    var rolesArr = string.IsNullOrEmpty(rolesCsv)
-                        ? Array.Empty<string>()
-                        : rolesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-                    items.Add(new UserListItem(id, name, email, originVal, rolesArr));
+                    var roles = string.IsNullOrWhiteSpace(rolesCsv) ? Array.Empty<string>() : rolesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                    items.Add(new UserListItem(
+                        rdr.GetGuid(0),
+                        rdr.GetString(1),
+                        rdr.GetString(2),
+                        rdr.GetString(3),
+                        roles));
                 }
             }
         }
@@ -101,75 +99,34 @@ public class UsersController : ControllerBase
         return Ok(new UserListResponse(total, page, pageSize, items));
     }
 
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<UserListItem>> GetById(Guid id)
-    {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
-        await using var conn = new SqlConnection(cs);
-        await conn.OpenAsync();
-
-        const string sql = @"
-            SELECT u.Id, u.Name, u.Email, u.Origin,
-                STUFF((
-                    SELECT ',' + r.Name
-                    FROM dbo.UserRole ur
-                    JOIN dbo.Role r ON r.Id = ur.RoleId
-                    WHERE ur.UserId = u.Id
-                    FOR XML PATH(''), TYPE
-                ).value('.', 'nvarchar(max)'), 1, 1, '') AS RolesCsv
-            FROM dbo.[User] u
-            WHERE u.Id = @Id;";
-
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = id });
-
-        await using var rdr = await cmd.ExecuteReaderAsync();
-        if (!await rdr.ReadAsync())
-            return NotFound();
-
-        var rolesCsv = rdr.IsDBNull(4) ? "" : rdr.GetString(4);
-        var rolesArr = string.IsNullOrEmpty(rolesCsv)
-            ? Array.Empty<string>()
-            : rolesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        return Ok(new UserListItem(rdr.GetGuid(0), rdr.GetString(1), rdr.GetString(2), rdr.GetString(3), rolesArr));
-    }
-
     [HttpPatch("{id:guid}/roles")]
-    public async Task<IActionResult> UpdateRoles(Guid id, [FromBody] UpdateRolesRequest req)
+    public async Task<ActionResult> UpdateRoles(Guid id, [FromBody] UpdateRolesRequest req)
     {
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
-        await using var tx = await conn.BeginTransactionAsync();
 
-        try
+        // Remover roles existentes
+        var del = new SqlCommand("DELETE FROM dbo.UserRole WHERE UserId = @U", conn);
+        del.Parameters.Add(new SqlParameter("@U", SqlDbType.UniqueIdentifier) { Value = id });
+        await del.ExecuteNonQueryAsync();
+
+        // Inserir novas roles
+        foreach (var role in req.Roles.Distinct())
         {
-            var del = new SqlCommand("DELETE FROM dbo.UserRole WHERE UserId=@U", conn, (SqlTransaction)tx);
-            del.Parameters.Add(new SqlParameter("@U", SqlDbType.UniqueIdentifier) { Value = id });
-            await del.ExecuteNonQueryAsync();
+            var roleIdCmd = new SqlCommand("SELECT Id FROM dbo.Role WHERE Name=@Name", conn);
+            roleIdCmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 50) { Value = role });
+            var roleIdObj = await roleIdCmd.ExecuteScalarAsync();
+            if (roleIdObj == null || roleIdObj is DBNull)
+                return BadRequest($"Role '{role}' não encontrada.");
+            var roleId = Convert.ToInt32(roleIdObj);
 
-            foreach (var r in req.Roles ?? Array.Empty<string>())
-            {
-                var roleIdCmd = new SqlCommand("SELECT Id FROM dbo.Role WHERE Name=@Name", conn, (SqlTransaction)tx);
-                roleIdCmd.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 50) { Value = r });
-                var roleIdObj = await roleIdCmd.ExecuteScalarAsync();
-                if (roleIdObj == null || roleIdObj is DBNull)
-                    continue;
-
-                var linkRole = new SqlCommand("INSERT INTO dbo.UserRole(UserId, RoleId) VALUES(@U,@R)", conn, (SqlTransaction)tx);
-                linkRole.Parameters.Add(new SqlParameter("@U", SqlDbType.UniqueIdentifier) { Value = id });
-                linkRole.Parameters.Add(new SqlParameter("@R", SqlDbType.Int) { Value = Convert.ToInt32(roleIdObj) });
-                await linkRole.ExecuteNonQueryAsync();
-            }
-
-            await tx.CommitAsync();
-            return NoContent();
+            var ins = new SqlCommand("INSERT INTO dbo.UserRole(UserId, RoleId) VALUES(@U,@R)", conn);
+            ins.Parameters.Add(new SqlParameter("@U", SqlDbType.UniqueIdentifier) { Value = id });
+            ins.Parameters.Add(new SqlParameter("@R", SqlDbType.Int) { Value = roleId });
+            await ins.ExecuteNonQueryAsync();
         }
-        catch
-        {
-            await tx.RollbackAsync();
-            throw;
-        }
+
+        return NoContent();
     }
 }

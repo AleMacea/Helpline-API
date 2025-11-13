@@ -29,7 +29,7 @@ public class ReportsController : ControllerBase
         if (DateTime.TryParse(from, out var fd)) fromDate = fd.Date;
         if (DateTime.TryParse(to, out var td)) toDate = td.Date;
 
-        var cs = _cfg.GetConnectionString("HelpLineDb");
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 

@@ -20,20 +20,21 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
         var problem = new ValidationProblemDetails(ctx.ModelState)
         {
             Status = StatusCodes.Status400BadRequest,
-            Title = "Corpo da requisição inválido.",
-            Detail = "Verifique o JSON enviado e os campos obrigatórios."
+            Title = "Corpo da requisiÃ§Ã£o invÃ¡lido.",
+            Detail = "Verifique o JSON enviado e os campos obrigatÃ³rios."
         };
         return new BadRequestObjectResult(problem);
     };
 });
 
-// CORS (ajuste origens conforme necessário)
+// CORS (ajuste origens conforme necessÃ¡rio)
 builder.Services.AddCors(opts => opts.AddPolicy("Default", p => p
 .WithOrigins(
 "http://localhost:5173",
 "http://localhost:3000",
 "http://localhost:8081",
-"http://localhost:19006"
+"http://localhost:19006",
+"https://helpline-api.azurewebsites.net"
 )
 .AllowAnyHeader()
 .AllowAnyMethod()
@@ -42,7 +43,7 @@ builder.Services.AddCors(opts => opts.AddPolicy("Default", p => p
 
 // JWT Auth
 var jwt = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwt["Key"] ?? throw new InvalidOperationException("Jwt:Key não configurada"));
+var key = Encoding.UTF8.GetBytes(jwt["Key"] ?? throw new InvalidOperationException("Jwt:Key nÃ£o configurada"));
 
 builder.Services
 .AddAuthentication(options =>
@@ -89,13 +90,14 @@ builder.Services.AddSwaggerGen(c =>
         }
     };
 
-    // Registra a definição e exige o uso do esquema por referência
+    // Registra a definiÃ§Ã£o e exige o uso do esquema por referÃªncia
     c.AddSecurityDefinition(jwtScheme.Reference.Id, jwtScheme);
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
     { jwtScheme, Array.Empty<string>() }
     });
 });
+
 var app = builder.Build();
 
 // Pipeline
@@ -115,13 +117,12 @@ app.UseExceptionHandler(errorApp =>
         await context.Response.WriteAsJsonAsync(problem);
     });
 });
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-    // não redirecionar HTTP em dev
-}
-else
+
+// âœ… SWAGGER CORRIGIDO - Agora funciona em produÃ§Ã£o tambÃ©m
+app.UseSwagger();
+app.UseSwaggerUI();
+
+if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
@@ -131,5 +132,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Redireciona a raiz para o Swagger
+app.MapGet("/", () => Results.Redirect("/swagger"));
 
 app.Run();
