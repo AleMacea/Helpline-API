@@ -190,15 +190,41 @@ public class FaqController : ControllerBase
         await using var conn = new SqlConnection(cs);
         await conn.OpenAsync();
 
-        const string sql = @"DELETE FROM dbo.Faq WHERE Id=@Id;";
-        await using var cmd = new SqlCommand(sql, conn);
-        cmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = id });
+        // Fazer o cast explícito para SqlTransaction
+        await using var transaction = (SqlTransaction)await conn.BeginTransactionAsync();
 
-        var rows = await cmd.ExecuteNonQueryAsync();
-        if (rows == 0)
-            return NotFound();
+        try
+        {
+            // Primeiro: deletar todos os feedbacks associados a esta FAQ
+            const string deleteFeedbacksSql = @"DELETE FROM dbo.FaqFeedback WHERE FaqId = @Id;";
+            await using var deleteFeedbacksCmd = new SqlCommand(deleteFeedbacksSql, conn, transaction);
+            deleteFeedbacksCmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = id });
+            await deleteFeedbacksCmd.ExecuteNonQueryAsync();
 
-        return NoContent();
+            // Depois: deletar a FAQ
+            const string deleteFaqSql = @"DELETE FROM dbo.Faq WHERE Id = @Id;";
+            await using var deleteFaqCmd = new SqlCommand(deleteFaqSql, conn, transaction);
+            deleteFaqCmd.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = id });
+
+            var rows = await deleteFaqCmd.ExecuteNonQueryAsync();
+
+            if (rows == 0)
+            {
+                await transaction.RollbackAsync();
+                return NotFound();
+            }
+
+            // Commit da transação se tudo deu certo
+            await transaction.CommitAsync();
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            // Rollback em caso de erro
+            await transaction.RollbackAsync();
+            // Log do erro (você pode adicionar logging aqui)
+            return StatusCode(500, $"Erro ao deletar FAQ: {ex.Message}");
+        }
     }
 
     // POST /faq/{id}/feedback — User/Analyst/Admin (upsert voto)
