@@ -21,7 +21,7 @@ public class AuthController : ControllerBase
     public AuthController(IConfiguration cfg) => _cfg = cfg;
 
     // DTOs
-    public record RegisterRequest(string Name, string Email, string Password, string Role = "User", string? InviteToken = null, string? Origin = null);
+    public record RegisterRequest(string Name, string Email, string Password, string Department = "Geral", string Role = "User", string? InviteToken = null, string? Origin = null);
     public record LoginRequest(string Email, string Password);
     public record AuthResponse(string Token, Guid UserId, string Name, string Email, string[] Roles);
 
@@ -44,7 +44,8 @@ public class AuthController : ControllerBase
             return BadRequest("Convite inválido para a função solicitada.");
         }
 
-        var origin = string.IsNullOrWhiteSpace(req.Origin) ? "web" : req.Origin;
+        var origin = string.IsNullOrWhiteSpace(req.Origin) ? "mobile" : req.Origin;
+        var department = string.IsNullOrWhiteSpace(req.Department) ? "Geral" : req.Department;
 
         var cs = _cfg.GetConnectionString("DatabaseConnection");
         await using var conn = new SqlConnection(cs);
@@ -69,14 +70,17 @@ public class AuthController : ControllerBase
         // Insere usuário com Origin
         var userId = Guid.NewGuid();
         var insertUser = new SqlCommand(@"
-            INSERT INTO dbo.Users(Id, Name, Email, PasswordHash, PasswordSalt, Origin)
-            VALUES(@Id, @Name, @Email, @Hash, @Salt, @Origin);", conn);
+            INSERT INTO dbo.Users(Id, Name, Email, PasswordHash, PasswordSalt, Origin, Department)          VALUES(@Id, @Name, @Email, @Hash, @Salt, @Origin, @Department);", conn);
         insertUser.Parameters.Add(new SqlParameter("@Id", SqlDbType.UniqueIdentifier) { Value = userId });
         insertUser.Parameters.Add(new SqlParameter("@Name", SqlDbType.NVarChar, 120) { Value = req.Name });
         insertUser.Parameters.Add(new SqlParameter("@Email", SqlDbType.NVarChar, 255) { Value = req.Email });
         insertUser.Parameters.Add(new SqlParameter("@Hash", SqlDbType.VarBinary, 64) { Value = hash });
         insertUser.Parameters.Add(new SqlParameter("@Salt", SqlDbType.VarBinary, 64) { Value = salt });
         insertUser.Parameters.Add(new SqlParameter("@Origin", SqlDbType.NVarChar, 16) { Value = origin });
+        insertUser.Parameters.Add(new SqlParameter("@Department", SqlDbType.NVarChar, 100) { Value = department });
+
+
+
         await insertUser.ExecuteNonQueryAsync();
 
         // Vincula Role
@@ -208,4 +212,5 @@ public class AuthController : ControllerBase
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
+
 

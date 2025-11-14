@@ -15,6 +15,7 @@ public class ReportsController : ControllerBase
     public ReportsController(IConfiguration cfg) => _cfg = cfg;
 
     public record ReportRow(string Dia, string Status, string Categoria, string Nivel, string Prioridade, int Qtde);
+    public record DepartmentTicketReport(string Department, int TicketCount, double? AverageMinutes, DateTime? LastActivity);
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ReportRow>>> Get(
@@ -89,6 +90,47 @@ public class ReportsController : ControllerBase
                     rdr.GetInt32(5)
                 ));
             }
+        }
+
+        return Ok(items);
+    }
+
+    [HttpGet("departments")]
+    public async Task<ActionResult<IEnumerable<DepartmentTicketReport>>> GetDepartmentReport([FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
+    {
+        var start = from ?? DateTime.MinValue;
+        var end = to ?? DateTime.UtcNow;
+        const string sql = @"
+            SELECT
+                COALESCE(u.Department, 'Geral') AS Department,
+                COUNT(*) AS TicketCount,
+                AVG(CAST(DATEDIFF(MINUTE, t.CreatedAt, COALESCE(t.UpdatedAt, t.CreatedAt)) AS FLOAT)) AS AvgMinutes,
+                MAX(COALESCE(t.UpdatedAt, t.CreatedAt)) AS LastActivity
+            FROM dbo.Ticket t
+            JOIN dbo.Users u ON u.Id = t.RequesterId
+            WHERE t.CreatedAt >= @From AND t.CreatedAt <= @To
+            GROUP BY COALESCE(u.Department, 'Geral')
+            ORDER BY TicketCount DESC;
+        ";
+
+        var cs = _cfg.GetConnectionString("DatabaseConnection");
+        await using var conn = new SqlConnection(cs);
+        await conn.OpenAsync();
+
+        await using var cmd = new SqlCommand(sql, conn);
+        cmd.Parameters.Add(new SqlParameter("@From", SqlDbType.DateTime2) { Value = start });
+        cmd.Parameters.Add(new SqlParameter("@To", SqlDbType.DateTime2) { Value = end });
+
+        var items = new List<DepartmentTicketReport>();
+        await using var rdr = await cmd.ExecuteReaderAsync();
+        while (await rdr.ReadAsync())
+        {
+            items.Add(new DepartmentTicketReport(
+                rdr.GetString(0),
+                rdr.GetInt32(1),
+                rdr.IsDBNull(2) ? null : rdr.GetDouble(2),
+                rdr.IsDBNull(3) ? null : rdr.GetDateTime(3)
+            ));
         }
 
         return Ok(items);
